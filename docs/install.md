@@ -27,7 +27,11 @@ cd ~/qwen-serving
 
 python3 -m venv venv
 venv/bin/pip install vllm==0.30.0 huggingface_hub hf_transfer ninja \
-  --extra-index-url https://flashinfer.ai/whl/ flashinfer-cubin==0.6.18.post1 pandas
+  --extra-index-url https://flashinfer.ai/whl/ flashinfer-cubin==0.6.18.post1 pandas \
+  nvidia-cuda-nvcc==13.0.88 nvidia-cuda-crt==13.0.88 nvidia-cuda-cccl==13.0.85 nvidia-nvvm==13.0.88
+# The four nvidia-* pins hold the CUDA 13 compiler at the runtime's 13.0 (see "Any
+# FlashInfer JIT needs nvcc ... to EQUAL" below): unpinned, pip now resolves nvcc 13.4
+# beside the 13.0 runtime, and the first FlashInfer JIT fails.
 # pandas is what `vllm[bench]` pulls in for the custom-dataset path: without it
 # bench/prefill_ab.sh's decode guard dies with "Please install vllm[bench] for
 # bench support" after the prefill rows have already run.
