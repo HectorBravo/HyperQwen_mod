@@ -38,15 +38,22 @@ nothing in `docker-compose.yml` needs editing:
 
 ```
 GPU_COUNT=2
-EXTRA_ARGS="--tensor-parallel-size 2 --language-model-only"
+EXTRA_ARGS="--tensor-parallel-size 2"
 ```
+
+(The launchers already pass `--language-model-only` unless `VISION=1`, so it does not
+belong in `EXTRA_ARGS`; an earlier version of this example repeated it.)
 
 `GPU_COUNT` defaults to 1, which is *the first card the runtime enumerates* —
 GPU 0, not necessarily the card you meant. On a mixed box, expose them all and
 pin inside the container with `GPU_COUNT=all` plus `CUDA_VISIBLE_DEVICES=1,2`
 (the device reservation decides what is visible, so `NVIDIA_VISIBLE_DEVICES`
 in `.env` alone was not enough; `CUDA_VISIBLE_DEVICES` is read inside the
-container and is what gotcha 53 recommends).
+container and is what gotcha 53 recommends). Set `CUDA_DEVICE_ORDER=PCI_BUS_ID`
+as well: by default CUDA numbers the fastest card first, so on a box that mixes
+generations `CUDA_VISIBLE_DEVICES=0,1` can name a different pair than `nvidia-smi`
+shows. That happens on native Linux too, not only under WSL2: a 5080 was paired
+with a 3080 that way in [#216](https://github.com/syv-ai/HyperQwen/issues/216).
 
 **Pin the KV pool before you measure anything, or before you trim `MAX_LEN`
 until the OOMs stop.** Under `--tensor-parallel-size > 1` the launcher
@@ -216,19 +223,22 @@ greedy decode:
 |---|---|---|---|
 | TP2 | 71.4 | 102.0 | 1.43x |
 | TP4 | 72.8 | 137.6 | 1.89x |
+| TP2, 2x RTX 3090 (sm86, uncapped, [#217](https://github.com/syv-ai/HyperQwen/issues/217)) | 90.9 | 156.0 | 1.72x |
 
-`tok/step` is ~2.7 in all four cells, so this is step time, not acceptance —
+`tok/step` is 2.5-2.7 in every cell, so this is step time, not acceptance —
 and the fp8/FlashInfer path does not scale with TP at all while the int8 path
 does. The KV pool costs ~5-9% for it. This inverts the single-card picture,
 where int8 on `TRITON_ATTN` is a long-context capacity trade that costs ~25% of
-decode at depth (`docs/gotchas.md` 40), so it is not a launcher default: it is
-one box, one card generation, and nobody has run the arm on Ampere at TP>1.
+decode at depth (`docs/gotchas.md` 40), so it is not a launcher default yet. The
+third row is the Ampere answer: two 3090s at TP=2 (peer-to-peer from a patched
+driver, no NVLink) show the same shape, 2.53 against 2.57 `tok/step` at the
+default temperature and roughly 31 against 18 ms per step.
 It is at least not a correctness trap on Ampere: at TP1 on the reference 3090
 (vLLM 0.29, async scheduling on) it passes the concurrent-garbage check from
 [#121](https://github.com/syv-ai/HyperQwen/issues/121) — three concurrent
 ~48K prompts three times over, then three alone, 9/9 and 3/3 valid, same as
 the fp8/FlashInfer control.
-If you have a dual-3090 box, that is the most useful A/B left in this file:
+The arm, for anyone who wants to check it on their own cards:
 
 ```
 SPEC=mtp CTX=long EXTRA_ARGS="--tensor-parallel-size 2 --attention-backend TRITON_ATTN --kv-cache-dtype int8_per_token_head"

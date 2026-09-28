@@ -58,7 +58,9 @@ will not have in production.
 | RTX 3090, `SPEC=dflash2 CTX=long` | 250 W | 113.4 tok/s | greedy (120.3 at the default temperature), `tok/step` 3.23 / 3.27, GSM8K 0.960 over 200, Docker at 73fd65d (vLLM 0.29). This profile is int8 KV on `TRITON_ATTN` (the launcher's DFlash2 long-context arm), not setup D's fp8 | [#194](https://github.com/syv-ai/HyperQwen/issues/194) |
 | 2x RTX 3060 12 GB (TP=2), setup D, a second box | 170 W | 62.4 tok/s | greedy (56.7 at the default temperature), `tok/step` 2.73 / 2.58, GSM8K 0.955 over 200, vLLM 0.29 at 1cf8665. Peer-to-peer enabled by a community-patched driver (aikitoria's open-gpu-kernel-modules) but custom all-reduce off, `VISION=1`, `MAX_SEQS=4`, `GPU_UTIL=0.89`, `MAX_LEN=131072`: not the same launch as the row above, so read the +7% loosely | [#205](https://github.com/syv-ai/HyperQwen/issues/205) |
 | 4x RTX 3060 Ti 8 GB (TP=4), setup E | 110 W/card | 118.1 tok/s | the only official profile that boots on 4x8 GB: `SPEC=dflash2 CTX=huge` at the launcher's own settings (380,218-token pool), greedy, `tok/step` 3.50 (113.9 / 3.45 at the default temperature), GSM8K 0.955 over 200. C8 lost 3/8 requests at the default temperature and 1/8 greedy. A, B, C and D all ran out of memory at startup; the adapted profiles that booted, and what each needed, are in the issue | [#210](https://github.com/syv-ai/HyperQwen/issues/210) |
-| CMP 170HX 64 GB unlocked (sm80) | 180 W pinned | **164.7 tok/s** | setup D, `SPEC=dflash2 CTX=fast`, greedy (155.3 at the default temperature), `tok/step` 3.38, vLLM 0.29.0 at da8a8e9, Docker. At the pin this is a power-capped number (see the note above), yet still 3090-class. Also the #72/#98 non-repro on this card, the stock-image positive control, and the boot-log lines from the thread: [cmp-170hx-64gb.md](cmp-170hx-64gb.md) | this write-up |
+| CMP 170HX 64 GB unlocked (sm80) | 180 W pinned | **164.7 tok/s** | setup B (`SPEC=dflash2 CTX=fast`), greedy (155.3 at the default temperature), `tok/step` 3.38, vLLM 0.29.0 at da8a8e9, Docker. At the pin this is a power-capped number (see the note above), yet still 3090-class. Also the #72/#98 non-repro on this card, the stock-image positive control, and the boot-log lines from the thread: [cmp-170hx-64gb.md](cmp-170hx-64gb.md) | this write-up |
+| 2x RTX 3090 (TP=2), no NVLink, peer-to-peer by a patched driver | 420 W (uncapped) | 90.9 tok/s | setup D as shipped: greedy (80.5 at the default temperature), `tok/step` 2.73 / 2.53, GSM8K 0.950 over 200, vLLM 0.29 at 1cf8665. The same profile with `EXTRA_ARGS="--attention-backend TRITON_ATTN --kv-cache-dtype int8_per_token_head"` reads **156.0** greedy (146.2 default) at the same `tok/step` 2.59 / 2.57, so the gap is the fp8/FlashInfer path's step time, not the drafter (~31 to ~18 ms per step). `SPEC=dflash2` on the same box, 170.6 greedy / 166.9 default at 3.40 / 3.41, GSM8K 0.960. Uncapped, so read it against other uncapped rows | [#217](https://github.com/syv-ai/HyperQwen/issues/217) |
+| 2x RTX 3080 20 GB (memory-modded, TP=2) | 220 W | 117.8 tok/s | `SPEC=dflash2 CTX=long` (int8 KV on `TRITON_ATTN`), greedy (114.8 at the default temperature), `tok/step` 3.28 / 3.25, GSM8K 0.970 over 200, on a third-party finetune (`ukisai/Swift-1.5-Qwen3.8-27b-W4A16-AutoRound`) with the stock DFlash2 drafter. Native Fedora, Docker, vLLM 0.29 at 1cf8665. `CTX=fast` read 122.0 greedy in one indicative run | [#216](https://github.com/syv-ai/HyperQwen/issues/216) |
 
 Batch profile (setup A), `bench/run_benchmarks.sh batch`, 64 concurrent on
 128 in / 512 out, aggregate decode:
@@ -137,8 +139,8 @@ other only loosely, and not rows for either table above:
   the tier 24/24. It also carries eight patches: four KVarN fixes, including
   one for the "!!!!" output (a late KVarN flush into a block that now holds
   another request's mamba state), and four vLLM backports for evicted DFlash2
-  conversations. They are not in this repo's series yet
-  ([#208](https://github.com/syv-ai/HyperQwen/issues/208)).
+  conversations ([#208](https://github.com/syv-ai/HyperQwen/issues/208)). The
+  "!!!!" fix is reworked in #222; the other seven are not in the series yet.
 - **2x RTX 3090, PCIe x8 without NVLink (TP=2)**: peer access through a
   community-patched driver lets vLLM's custom all-reduce run with the
   launcher's `expandable_segments:False` default. C1 greedy 207.5-211.9 tok/s
@@ -147,6 +149,24 @@ other only loosely, and not rows for either table above:
   fragmentation soak with 200k prefills plus concurrent 60k prompts held 10/10
   up to `GPU_UTIL=0.96`, and both allocator settings failed identically at
   0.97 ([#163](https://github.com/syv-ai/HyperQwen/issues/163)).
+- **2x RTX 3080 20 GB (TP=2), on a box that also holds an RTX 5080**: the
+  table row above, plus three setup notes. On a mixed box CUDA orders devices
+  fastest first, so `CUDA_VISIBLE_DEVICES=0,1` paired the 5080 with a 3080;
+  `CUDA_DEVICE_ORDER=PCI_BUS_ID` makes the indices match `nvidia-smi`. The
+  AutoRound export loads through vLLM 0.29's GPTQ path after two `config.json`
+  edits (`quant_method` to `gptq`, and `desc_act: false` added), because 0.29
+  has no `auto-round` entry. The harness client's SSE reader gave up on
+  prompts of 48k and more while the server completed them, so those prefill
+  rows come from the engine log
+  ([#216](https://github.com/syv-ai/HyperQwen/issues/216)).
+- **2x RTX 3090 (TP=2) with peer-to-peer from aikitoria's patched driver, no
+  NVLink**: setup D's fp8/FlashInfer path is the slow part at TP=2. Moving the
+  same profile to int8 KV on `TRITON_ATTN` took C1 from 80.5 to 146.2 tok/s at
+  the default temperature with acceptance unchanged, which is what #105 found
+  at TP4 and #156 found under WSL2. `SPEC=dflash2` stayed ahead at 166.9, and
+  it was also the reporter's best result in real coding traffic (over 100
+  tok/s, against 40-50 for the MTP arms)
+  ([#217](https://github.com/syv-ai/HyperQwen/issues/217)).
 - **2x RTX 4090 without peer-to-peer (x8 + x4, Docker on WSL2)**: TP=2 is
   slower than one card, single-user and batch, and two independent engines
   (`--data-parallel-size 2`) give 1.92x one card on a batch burst. The numbers

@@ -22,7 +22,7 @@ reporter's exact repro shape and under the maintainer's closing protocol.**
 | GPU | NVIDIA CMP 170HX, VRAM-unlocked to 64 GiB (GA100, sm_80), PCIe Gen2 x4 (riser), driver **610.57.04**, CUDA UMD 13.x |
 | Power | pinned 180 W (not raised) |
 | OS | Ubuntu, headless; Docker everywhere |
-| Images | `ghcr.io/syv-ai/qwen38-27b-rtx3090:sha-69ba4d0` (vLLM **0.27.1**) and a local build of **main** `da8a8e9` (vLLM **0.29.0**, all 59 patches + KVarN, verify.sh clean) |
+| Images | `ghcr.io/syv-ai/qwen38-27b-rtx3090:sha-69ba4d0` (vLLM **0.27.1**) and a local build of **main** `da8a8e9` (vLLM **0.29.0**, the 46-patch series + KVarN, verify.sh clean) |
 | models | `Qwen3.8-27B-W4A16-AutoRound-fast` + DFlash2 drafter W4A16 (and the Huihui abliterated INT4-AWQ-GPTQ variant on the 0.27.1 image) |
 
 One difference from both reporters worth flagging: **driver 610.57.04, not
@@ -43,7 +43,7 @@ Sliding-window bucket(s) are the smallest; using group_size 8 ...
 int32 overflow wall at `floor(2^31 / (BS*Hkv*D))` blocks (≈ 4,369 at BS=480, scale-
 equivalent here), the highest block id reaches **~59% of the wall at util 0.93**,
 **~71% at util 1.0 with zero overhead**. Same `group_size 8` on the 0.29.0 boot (block
-size 448, 5.2 GiB pinned pool). **The sensitive input he flagged is confirmed: the wall
+size 448, 5.2 GiB pinned pool). **The sensitive input the thread flagged is confirmed: the wall
 is unreachable on this card at any boot this stack produces** — on both vLLM versions.
 
 ## #72 repro attempts — all clean
@@ -77,7 +77,7 @@ config), `MAX_SEQS=4`, the reporter's bench shape, one boot:
 
 ## Harness rows (main `da8a8e9`, 0.29.0, `Qwen3.8-27B-W4A16-AutoRound-fast`)
 
-`bench/run_benchmarks.sh single`, first row is the README-protocol second run:
+`bench/run_benchmarks.sh single` on setup B (`SPEC=dflash2 CTX=fast`), first row is the README-protocol second run:
 
 | cohort | e2e | decode | tok/step |
 |---|---:|---:|---:|
@@ -103,4 +103,4 @@ one-variable A/B on hardware that actually dies.
 
 Raw logs: 0.27.1 campaigns and the stock controls in this box's
 `~/services/qwen38-cmp/phase0-logs/`; the 0.29.0 protocol and harness output in the
-issue comment.
+description of the pull request that added this page (#218).
