@@ -23,8 +23,10 @@ full reproductions; the list below collects the shorter reports from issues.
   the 0.28→0.29 regression is 1M-specific) and at 1M (0.29 regresses −10 to
   −22 %), the 24 GB mamba-align ceiling (~16–32k per single request) and the
   cudagraph-64 capture OOM, plus a **0.30 follow-up: the 1M regression is
-  unchanged on vLLM 0.30, 1× stays GO** — consolidates the #228 / #229 field
-  reports
+  unchanged on vLLM 0.30, 1× stays GO** and a **TP=2 all-reduce-count test: TP2
+  is worse than TP4 (−22 to −34 % prefill, −53 % C8, grows with size) and cannot
+  hold 1M on 24 GB (~860k)** — so the regression is a 1M-profile effect, not an
+  all-reduce-count effect — consolidates the #228 / #229 field reports
 
 ## Results from other hardware
 
