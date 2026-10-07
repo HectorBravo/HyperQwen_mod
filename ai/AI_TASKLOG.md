@@ -4,9 +4,9 @@
 
 | Created | Task | Status | Type | Subtasks | Time Spent | Blockers |
 |---------|------|--------|------|----------|------------|----------|
-| 08-10-2026 02:25:40 | [T1: Migrate HyperQwen Windows launchers to fork + re-apply FlashInfer cu13 link shim](#task-t1-migrate-hyperqwen-windows-launchers-to-fork--re-apply-flashinfer-cu13-link-shim) | <span style="background-color:#0969da;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">in_progress</span> | <span style="background-color:#9e6a03;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">fix</span> | 6/9 | 5m | none |
+| 08-10-2026 02:25:40 | [T1: Migrate HyperQwen Windows launchers to fork + re-apply FlashInfer cu13 link shim](#task-t1-migrate-hyperqwen-windows-launchers-to-fork--re-apply-flashinfer-cu13-link-shim) | <span style="background-color:#0969da;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">in_progress</span> | <span style="background-color:#9e6a03;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">fix</span> | 9/10 | 28m | none |
 
-> ✅ **0 completed task(s)** — [View completed tasks](#completed-tasks)
+> **0 completed task(s)** — [View completed tasks](#completed-tasks)
 
 ---
 
@@ -15,10 +15,10 @@
 - **Status**: <span style="background-color:#0969da;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">in_progress</span>
 - **Type**: <span style="background-color:#9e6a03;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">fix</span>
 - **Created**: 08-10-2026 02:25:40
-- **Last Updated**: 08-10-2026 02:30:00
-- **Time Spent**: 5m
+- **Last Updated**: 08-10-2026 02:54:08
+- **Time Spent**: 28m
 - **Branch**: [`fix/ai-flashinfer-cu13-link-shim`](https://github.com/HectorBravo/HyperQwen_mod/tree/fix/ai-flashinfer-cu13-link-shim)
-- **Commit(s)**: pending
+- **Commit(s)**: [`9ec570d`](https://github.com/HectorBravo/HyperQwen_mod/commit/9ec570dd6f634fd68a4a10fdac6af35739cb0cc3) (main: task log, before code push) · [`2130381`](https://github.com/HectorBravo/HyperQwen_mod/commit/2130381e0bf077dd94df0837bb127ffaafd8c5c9) (fix/ai-flashinfer-cu13-link-shim: FlashInfer cu13 link shim in `single-user/start_qwen.sh`) · [`719ccd8`](https://github.com/HectorBravo/HyperQwen_mod/commit/719ccd837a48b498ea1f9904d4091f24f006f21b) (fix/ai-flashinfer-cu13-link-shim: gitignore launcher `.bat` — carries the `VLLM_API_KEY`, must never be committed)
 - **Blockers**: none
 - **Findings & Notes**:
   - The migration is a **Windows-side path repoint**, not a WSL migration. All WSL-side content stays in `/home/hbravo/hyperqwen/` (venv) and `C:/test_ai/models` (models) — untouched.
@@ -28,6 +28,7 @@
   - The only other stale path reference anywhere in `D:\Repos` is `D:\Repos\configs\.config\lazygit\state.yml` (a lazygit UI-state file that self-updates) — intentionally left alone.
   - The cu13 FlashInfer link shims **already persist** in the WSL venv (`.../nvidia/cu13/lib64/libcudart.so` and `.../lib64/stubs/libcuda.so`), so a boot from the fork works even before the code lands; the code makes the shim idempotent and self-healing on a fresh venv.
   - The 0-byte `bench/results/cohort_Tdefault_c1.log` in the old clone is an empty placeholder — not migrated (it is gitignored).
+  - **Key protection (per user instruction, 08-10-2026):** the user required that the real `VLLM_API_KEY` **never be committed**. Verified the secret value (the `sk-lm-...` string in `start-single.bat` line 44) is **absent** from every tracked file on both `main` and `fix/ai-flashinfer-cu13-link-shim` (a `git grep` for the key's unique value substring → no hits; only the *variable name* `VLLM_API_KEY` appears in tracked scripts/docs). No fragment of the key appears anywhere in this log. The `.bat` launchers were untracked, but **not** in `.gitignore`, so a stray `git add .` could commit the key. Hardened `.gitignore` to ignore `start-single.bat` and `start_single-*.bat` (commit [`719ccd8`](https://github.com/HectorBravo/HyperQwen_mod/commit/719ccd837a48b498ea1f9904d4091f24f006f21b) on the feature branch). `.env` does not exist locally; the repo's own `resolve_api_key.sh` supports `api_key.txt`/`.env` as the safe home for the key, but none of that is committed here.
   - **Tracked deliverable** = `single-user/start_qwen.sh` only (the FlashInfer cu13 link shim). The 7 `.bat` launchers and the two repo-root reparse points (`venv`, `models`) are **untracked local artifacts** (all already in `.gitignore`) — copied into the fork but **not** committed, matching how the old repo kept them.
 
 ### User Confirmations
@@ -39,6 +40,7 @@
 **Confirmed (user provided):**
 
 - (08-10-2026) WSL-side content stays in `/home/hbravo/hyperqwen/` → "go" (proceed with the plan as scoped; WSL side untouched).
+- (08-10-2026) If `start-single.bat` is ever to be committed, first make sure the `VLLM_API_KEY` is not committed (use `.env` or other method; the key must not be committed). → Resolved: the `.bat` is **not** committed (stays a local untracked artifact); `.gitignore` hardened to ignore the launcher `.bat` files (`719ccd8`) so the key can never be swept into a commit.
 
 ### Subtasks / Plan
 
@@ -49,8 +51,8 @@
 - [x] Copy the 7 `.bat` launchers into the fork (1:1, checksum-verified)
 - [x] Repoint `REPO_PATH` in fork `start-single.bat` → `/mnt/d/repos/HyperQwen_mod`
 - [x] Apply the FlashInfer cu13 link shim to fork `single-user/start_qwen.sh` (1:1, diff-verified, `bash -n` clean)
-- [ ] Commit `ai/AI_TASKLOG.md` on `main` (before code push) and push `main`
-- [ ] Create `fix/ai-flashinfer-cu13-link-shim`, commit + push only `single-user/start_qwen.sh`
+- [x] Commit `ai/AI_TASKLOG.md` on `main` (before code push) and push `main`
+- [x] Create `fix/ai-flashinfer-cu13-link-shim`, commit + push only `single-user/start_qwen.sh` (also a `.gitignore` commit `719ccd8` for the launcher `.bat`)
 - [ ] Final verification: boot `single-long` (GPU2) from the fork — confirm FlashInfer JIT link succeeds, `ldd` resolves `libcudart.so.13`; boot `single-fast` to confirm unaffected
 
 ### Full Context Notes for AI Agents
@@ -74,7 +76,7 @@
 - 7 `.bat` files copied into the fork root: `start-single.bat` (the only path-bearing one) + 6 wrappers `start_single-{fast,long}-cuda{0,1,2}.bat` (each just `call start-single.bat <type> <gpu>` — no path).
 - `start-single.bat` line 41 repointed: `set REPO_PATH=/mnt/d/repos/HyperQwen` → `/mnt/d/repos/HyperQwen_mod`. Line 45 `CUDA_HOME=/home/hbravo/hyperqwen/venv/lib/python3.14/site-packages/nvidia/cu13` is an absolute WSL path (clone-independent) → left as-is. Line 44 carries a real `VLLM_API_KEY` (untracked secret — do NOT commit; it is in the gitignored `.bat`).
 - Reparse points created in fork via WSL: `ln -s /home/hbravo/hyperqwen/venv /mnt/d/Repos/HyperQwen_mod/venv` and `ln -s /mnt/c/test_ai/models /mnt/d/Repos/HyperQwen_mod/models`. Both resolve from WSL and show as `ReparsePoint` from Windows.
-- `.gitignore` already lists `venv`, `models`, `api_key.txt`, `.env`, `bench/results/` (with a "local reproduction artifacts (symlinks here, so no trailing slash)" note) → none of these are committable; the `.bat` files are simply untracked (never `git add`ed — same state as the old repo).
+- `.gitignore` already lists `venv`, `models`, `api_key.txt`, `.env`, `bench/results/` (with a "local reproduction artifacts (symlinks here, so no trailing slash)" note) → none of these are committable. The 7 `.bat` launchers carry the **real** `VLLM_API_KEY` (`start-single.bat` line 44) — added `start-single.bat` and `start_single-*.bat` to `.gitignore` (commit [`719ccd8`](https://github.com/HectorBravo/HyperQwen_mod/commit/719ccd837a48b498ea1f9904d4091f24f006f21b), on the feature branch) so they can never be committed by a stray `git add .`; they remain **untracked local artifacts** on `main` until the branch merges.
 
 **Git plan (house rules)**
 - Identity: `GIT_AUTHOR_NAME=AI_bot`, `GIT_COMMITTER_NAME=AI_bot`; do NOT set author/committer email (use user's `git config user.email`); never modify `git config`.
