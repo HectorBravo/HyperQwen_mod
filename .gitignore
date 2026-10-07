@@ -15,3 +15,6 @@ venv
 models
 api_key.txt
 bench/results/
+# local WSL launcher .bat files — contain the real VLLM_API_KEY; never commit
+start-single.bat
+start_single-*.bat
