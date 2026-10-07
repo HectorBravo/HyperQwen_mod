@@ -92,6 +92,42 @@ if [ -z "${CUDA_HOME:-}" ]; then
   done
 fi
 
+# The pip nvidia-cuda-runtime-cu13 wheel (this file's auto-detect above, or the
+# CUDA_HOME a start_single-*.bat points at it) ships a layout FlashInfer's JIT
+# does not expect: only a versioned lib/libcudart.so.13 in lib/, with no lib64/
+# and no libcuda driver stub. But flashinfer/jit/cpp_ext.py:256 hardcodes
+#   -L$CUDA_HOME/lib64 -L$CUDA_HOME/lib64/stubs -lcudart -lcuda
+# so the first FlashInfer kernel build (CTX=long's fp8-KV batch_prefill, the
+# MTP verify path) dies at the LINK step with "cannot find -lcudart" / "-lcuda",
+# mid-boot, after model load. CTX=fast uses FlashAttention and never JITs
+# FlashInfer, so it is unaffected -- which is why only the long batch scripts
+# hit this. Create the two link targets the generator looks for, idempotently:
+# libcudart is the toolkit's own .so.13; libcuda is the driver (WSL exposes it
+# at /usr/lib/wsl/lib/libcuda.so.1; non-WSL hosts resolve it via ldconfig).
+# A native /usr/local/cuda (lib64 + stubs) has no lib/libcudart.so.N, so this
+# block is a no-op for it.
+if [ -n "${CUDA_HOME:-}" ]; then
+  CU13_CUDART=$(ls "$CUDA_HOME"/lib/libcudart.so.[0-9]* 2>/dev/null | head -n1)
+  if [ -n "$CU13_CUDART" ]; then
+    if [ ! -f "$CUDA_HOME/lib64/libcudart.so" ]; then
+      mkdir -p "$CUDA_HOME/lib64"
+      ln -sf "$CU13_CUDART" "$CUDA_HOME/lib64/libcudart.so"
+      echo "[start_qwen] FlashInfer link shim: libcudart -> $CU13_CUDART"
+    fi
+    if [ ! -f "$CUDA_HOME/lib64/stubs/libcuda.so" ]; then
+      mkdir -p "$CUDA_HOME/lib64/stubs"
+      LIBCUDA=$(ldconfig -p 2>/dev/null | awk '/libcuda\.so\.[0-9]+/ {print $NF}' | head -n1)
+      { [ -n "$LIBCUDA" ] && [ -e "$LIBCUDA" ]; } || LIBCUDA=/usr/lib/wsl/lib/libcuda.so.1
+      if [ -e "$LIBCUDA" ]; then
+        ln -sf "$LIBCUDA" "$CUDA_HOME/lib64/stubs/libcuda.so"
+        echo "[start_qwen] FlashInfer link shim: libcuda -> $LIBCUDA"
+      else
+        echo "[start_qwen] WARNING: no libcuda driver stub found; FlashInfer JIT link may fail" >&2
+      fi
+    fi
+  fi
+fi
+
 # Backlog 6 / F13: one validated resolver — refuses unknown CTX/SPEC, warns on
 # ignored (KV) and EXTRA_ARGS-shadowed controls, prints the redacted effective
 # config. Refusal exits here, before anything boots. The launcher does not run
