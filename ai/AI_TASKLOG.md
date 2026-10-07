@@ -5,9 +5,8 @@
 | Created | Task | Status | Type | Subtasks | Time Spent | Blockers |
 |---------|------|--------|------|----------|------------|----------|
 | 08-10-2026 02:25:40 | [T1: Migrate HyperQwen Windows launchers to fork + re-apply FlashInfer cu13 link shim](#task-t1-migrate-hyperqwen-windows-launchers-to-fork--re-apply-flashinfer-cu13-link-shim) | <span style="background-color:#0969da;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">in_progress</span> | <span style="background-color:#9e6a03;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">fix</span> | 9/10 | 44m | none |
-| 08-10-2026 03:14:30 | [T2: Commit .bat launchers + project indexer (api_key.txt key migration)](#task-t2-commit-bat-launchers--project-indexer-api_keytxt-key-migration) | <span style="background-color:#9e6a03;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">in_progress</span> | <span style="background-color:#57606a;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">chore</span> | 0/4 | 0m | none |
 
-> **0 completed task(s)** — [View completed tasks](#completed-tasks)
+> **1 completed task(s)** — [View completed tasks](#completed-tasks)
 
 ---
 
@@ -101,15 +100,23 @@
 
 ---
 
+## Completed Tasks
+
+| Created | Task | Type | Subtasks | Time Spent |
+|---------|------|------|----------|------------|
+| 08-10-2026 03:14:30 | [T2: Commit .bat launchers + project indexer (api_key.txt key migration)](#task-t2-commit-bat-launchers--project-indexer-api_keytxt-key-migration) | <span style="background-color:#57606a;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">chore</span> | 6/6 | 12m |
+
+---
+
 ## Task T2: Commit .bat launchers + project indexer (api_key.txt key migration)
 
-- **Status**: <span style="background-color:#0969da;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">in_progress</span>
+- **Status**: <span style="background-color:#22863a;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">done</span>
 - **Type**: <span style="background-color:#57606a;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">chore</span>
 - **Created**: 08-10-2026 03:14:30
-- **Last Updated**: 08-10-2026 03:14:30
-- **Time Spent**: 0m
+- **Last Updated**: 08-10-2026 03:26:00
+- **Time Spent**: 12m
 - **Branch**: [`chore/ai-commit-bat-launchers-and-indexer`](https://github.com/HectorBravo/HyperQwen_mod/tree/chore/ai-commit-bat-launchers-and-indexer)
-- **Commit(s)**: pending
+- **Commit(s)**: [`569153e`](https://github.com/HectorBravo/HyperQwen_mod/commit/569153e)
 - **Blockers**: none
 - **Findings & Notes**:
   - The repo's `resolve_api_key.sh` already supports `api_key.txt` as the file fallback for `VLLM_API_KEY`. The `.bat` files no longer need to carry the key — `start_qwen.sh` sources `resolve_api_key.sh` which reads `api_key.txt` from the repo root.
@@ -131,12 +138,12 @@
 
 ### Subtasks / Plan
 
-- [ ] Update `ai/AI_TASKLOG.md` before push
-- [ ] Commit task log to `main` (dedicated commit)
-- [ ] Create branch `chore/ai-commit-bat-launchers-and-indexer`
-- [ ] Add + commit `.bat` files, `ai/PROJECT_DESCRIPTION.md`, `AGENTS.md`
-- [ ] Push branch to origin
-- [ ] Update `ai/AI_TASKLOG.md` after push, commit + push to `main`
+- [x] Update `ai/AI_TASKLOG.md` before push
+- [x] Commit task log to `main` (dedicated commit)
+- [x] Create branch `chore/ai-commit-bat-launchers-and-indexer`
+- [x] Add + commit `.bat` files, `ai/PROJECT_DESCRIPTION.md`, `AGENTS.md`
+- [x] Push branch to origin
+- [x] Update `ai/AI_TASKLOG.md` after push, commit + push to `main`
 
 ### Full Context Notes for AI Agents
 
@@ -173,9 +180,4 @@
 
 **`AGENTS.md`:** Managed block (PROJECT_INDEXER markers) + user-managed section with repo-specific security rules about `api_key.txt` and `.bat` files.
 
----
 
-## Completed Tasks
-
-| Created | Task | Type | Subtasks | Time Spent |
-|---------|------|------|----------|------------|
