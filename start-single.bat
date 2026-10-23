@@ -25,10 +25,12 @@ REM Calculate CTX
 if /i "%TYPE%"=="fast" (
     set CTX=fast
     set KV_TYPE=bf16
+    set SPEC=dflash2
 ) else (
     if /i "%TYPE%"=="long" (
         set CTX=long
         set KV_TYPE=fp8
+        set SPEC=mtp
     ) else (
         echo Error: type must be 'fast' or 'long'
         goto :end
@@ -40,8 +42,13 @@ REM Configuration (edit these)
 REM ==============================
 set REPO_PATH=/mnt/d/repos/HyperQwen_mod
 set HOST=0.0.0.0
+set PREFIX_CACHE=1
 set VLLM_WSL2_ENABLE_PIN_MEMORY=1
 set CUDA_HOME=/home/hbravo/hyperqwen/venv/lib/python3.14/site-packages/nvidia/cu13
+set INT8_ACT=int8
+set PREFILL_ATTN=int8
+
+rem set DFLASH_TOKENS=15
 
 rem set PORT=18020
 
@@ -54,8 +61,7 @@ echo.
 echo Starting server... (takes ~90s)
 echo.
 
-wsl -d Ubuntu-26.04 -- bash -c "cd %REPO_PATH% && CUDA_VISIBLE_DEVICES=%GPU% VLLM_WSL2_ENABLE_PIN_MEMORY=%VLLM_WSL2_ENABLE_PIN_MEMORY% CTX=%CTX% HOST=%HOST% PORT=%PORT% CUDA_HOME=%CUDA_HOME% bash single-user/start_qwen.sh"
-rem wsl -d Ubuntu-26.04 -- bash -c "cd %REPO_PATH% && CUDA_VISIBLE_DEVICES=%GPU% VLLM_WSL2_ENABLE_PIN_MEMORY=%VLLM_WSL2_ENABLE_PIN_MEMORY% CTX=%CTX% HOST=%HOST% PORT=%PORT% CUDA_HOME=%CUDA_HOME% bash single-user/start_qwen.sh"
+wsl -d Ubuntu-26.04 -- bash -c "cd %REPO_PATH% && CUDA_VISIBLE_DEVICES=%GPU% VLLM_WSL2_ENABLE_PIN_MEMORY=%VLLM_WSL2_ENABLE_PIN_MEMORY% CTX=%CTX% HOST=%HOST% PORT=%PORT% CUDA_HOME=%CUDA_HOME% INT8_ACT=%INT8_ACT% PREFILL_ATTN=%PREFILL_ATTN% SPEC=%SPEC% PREFIX_CACHE=%PREFIX_CACHE% DFLASH_TOKENS=%DFLASH_TOKENS% bash single-user/start_qwen.sh"
 
 echo.
 echo Server stopped.
