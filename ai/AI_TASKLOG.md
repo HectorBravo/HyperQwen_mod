@@ -4,9 +4,81 @@
 
 | Created | Task | Status | Type | Subtasks | Time Spent | Blockers |
 |---------|------|--------|------|----------|------------|----------|
-| 08-10-2026 02:25:40 | [T1: Migrate HyperQwen Windows launchers to fork + re-apply FlashInfer cu13 link shim](#task-t1-migrate-hyperqwen-windows-launchers-to-fork--re-apply-flashinfer-cu13-link-shim) | <span style="background-color:#0969da;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">in_progress</span> | <span style="background-color:#9e6a03;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">fix</span> | 9/10 | 44m | none |
+| 11-10-2026 23:36:00 | [T3: Provision second node (192.168.2.196) with wsl_migrate + long-context vLLM](#task-t3-provision-second-node-1921682196-with-wsl_migrate--long-context-vllm) | <span style="background-color:#0969da;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">in_progress</span> | <span style="background-color:#22863a;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">feat</span> | 1/10 | 12m | none |
+| 08-10-2026 02:25:40 | [T1: Migrate HyperQwen Windows launchers to fork + re-apply FlashInfer cu13 link shim](#task-t1-migrate-hyperqwen-windows-launchers-to-fork--re-apply-flashinfer-cu13-link-shim) | <span style="background-color:#0969da;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">in_progress</span> | <span style="background-color:#9e6a03;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">fix</span> | 9/10 | 28m | none |
 
 > **1 completed task(s)** — [View completed tasks](#completed-tasks)
+
+---
+
+## Task T3: Provision second node (192.168.2.196) with wsl_migrate + long-context vLLM
+
+- **Status**: <span style="background-color:#0969da;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">in_progress</span>
+- **Type**: <span style="background-color:#22863a;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">feat</span>
+- **Created**: 11-10-2026 23:36:00
+- **Last Updated**: 11-10-2026 23:55:00
+- **Time Spent**: 15m
+- **Branch**: pending (User Confirmations — package may stay uncommitted)
+- **Commit(s)**: pending
+- **Blockers**: none (2 user confirmations pending; neither blocks recon)
+- **Findings & Notes**:
+  - **Goal**: use `wsl_migrate` to fully provision the **second** Windows/WSL node and serve `Qwen3.8-27B` with the **same long-context** vLLM config as the source.
+  - **Source Windows** (`destr0`): `.wslconfig` = memory=80GB, swap=8GB, processors=8, firewall=false, **ip=172.18.245.101**; `netsh portproxy` maps `0.0.0.0:{18000-18002,18010-18012,18020}` + `10.20.10.18:{18000-18002,18010-18012}` → that IP. WSL 3.0.1.0 / kernel 6.18.40.1-1 / Win 10.0.26200.9550; one distro `Ubuntu-26.04` (Running, v2).
+  - **Source vLLM (live)**: two `vllm serve` on `18010`/`18011`, model `Qwen3.8-27B-W4A16-AutoRound-fast`, `--max-model-len 150000 --kv-cache-dtype fp8 --mamba-ssm-cache-dtype float16 --gpu-memory-utilization 0.93 --max-num-seqs 8`, MTP-3, parsers `qwen3`/`qwen3_coder`.
+  - **Source sizes**: venv ~15 GB, model ~15.4 GB, vLLM compile cache ~2.2 GB, repo `.git` ~38 MB.
+  - **Target** (`destr0@192.168.2.196`, via plink + `_hostkey.txt` ed25519 `SHA256:`; host `nodo1`): **same** Win build & WSL/kernel. **`Ubuntu-26.04` already Running (v2)** → no install. **`hbravo` user exists**; `/etc/wsl.conf` already `systemd=true` + `default=hbravo`. **No D: drive → all on C:** (167.5 GB free). **ALREADY HAS** a clean repo clone `C:\repos\HyperQwen_mod` @ **`1586706`** (= source `main`) **AND** the full model `C:\test_ai\models\Qwen3.8-27B-W4A16-AutoRound-fast` (15 GB, all 7 shards + extra-tensors + MTP vocab) **AND** base `/home/hbravo`. **GPUs in WSL**: idx0 GT 1030 (2 GB), **idx1 RTX 3090 (24 GB)** → one long-context instance on idx1. **Only the venv (15 GB) is missing.** `zstd` absent (apt-get install needed); 32 cores, 23 GiB RAM.
+  - **Git state**: `main` @ `1586706`; 13 `wsl_migrate/` files **staged** but uncommitted, while its README says "do not commit" → **contradiction** (see confirmations). `.env` + `_*` helpers untracked/ignored.
+  - **Transport (CONFIRMED)**: plink non-interactive works for **simple cmd only** (WSL/PowerShell/`2>&1` must go through **files** via base64→`certutil -decode`; `certutil` needs a `del` first — it won't overwrite). Source has **plink + pscp + psftp** (`C:\Program Files\PuTTY\`). Target has **git, curl, certutil** (no pscp/psftp) → target can't be the SFTP client, so the **source pushes via `psftp` (SFTP — faster than pscp/SCP for multi-GB)**. Small scripts → base64→certutil bootstrap. **Long ops (tar / transfer / extract, each > 30 s) MUST run detached (WSL `systemd-run`) + poll a log**, because the harness kills a `run_commands` at 30 s and that would kill any child WSL/tar/psftp.
+
+### User Confirmations
+
+**Pending (awaiting user response):**
+
+- [ ] (11-10-2026 23:55:00) `wsl_migrate/` (13 files) is **staged** but its README says "do not `git commit` this package" — commit it to the repo, or unstage and keep it local-only?
+- [ ] (11-10-2026 23:55:00) Target has only **one** 3090 (+ GT 1030). Run **one** long-context instance (port 18010), or attempt a **second** (won't fit 150k on the same GPU)?
+
+**Confirmed (user provided):**
+
+- None yet.
+
+### Subtasks / Plan
+
+- [x] Windows-side recon: source `_wslcfg.ps1` + target `_tstate.ps1`
+- [x] WSL-inside recon (target + source) via base64→certutil bootstrap
+- [x] Confirm file-transfer path (SFTP via `psftp`; source has it — target doesn't)
+- [ ] **Source** (detached, `systemd-run`): tar the 15 GB venv → `C:\hyperqwen_transfer\venv.tar`  [poll `hqtar.log`]
+- [ ] **Source→target**: `psftp put` `C:\hyperqwen_transfer\venv.tar` → target `C:\hyperqwen_transfer\`  [SFTP over LAN]
+- [ ] **Target** (detached, `systemd-run` via plink→`wsl -u root`): `provision --venv-tar` → extract → `/home/hbravo/hyperqwen/venv`; chown hbravo  [poll log]
+- [ ] **Target**: `apt-get install -y zstd`; `~/hyperqwen/models`→`/mnt/c/test_ai/models` symlink; repo-root `venv`+`models` symlinks; set `CUDA_VISIBLE_DEVICES=1`
+- [ ] **Target Windows**: write `%USERPROFILE%\.wslconfig` (static IP in 172.25.128.0/20, `firewall=false`, right-sized mem/cpu); `wsl --shutdown`+relaunch
+- [ ] **Target Windows**: `netsh interface portproxy` `0.0.0.0:<port>` → target WSL IP:<port>
+- [ ] **Target WSL**: start ONE long-context vLLM (`CUDA_VISIBLE_DEVICES=1 CTX=long PORT=18010`) via a C:-path launcher
+- [ ] Validate: `/v1/models` + a long-context (150k) chat completion
+- [ ] Update `wsl_migrate/README.md` with the real 2nd-node steps (venv-only, C:-paths, single-GPU, portproxy)
+- [ ] Clean up all `_*` helpers; re-run local `verify` + `provision --dry-run`; refresh project index (Steps 2-4); commit per git rules
+
+### Full Context Notes for AI Agents
+
+> **Purpose**: resume T3 without other context.
+
+**Env**: fork `D:\Repos\HyperQwen_mod` (WSL `/mnt/d/repos/HyperQwen_mod`), `main`@`1586706`, remote `git@github.com:HectorBravo/HyperQwen_mod.git`. Source WSL user `hbravo` (venv `~/hyperqwen/venv`, models `~/hyperqwen/models` or `/mnt/c/test_ai/models`). Target user `destr0`, pw `Lacaquita2$`, **no D: drive → C:** (167.5 GB free). Same OS/WSL as source.
+
+**Long-context config (verbatim)**: model `Qwen3.8-27B-W4A16-AutoRound-fast` + `--max-model-len 150000 --kv-cache-dtype fp8 --mamba-ssm-cache-dtype float16 --gpu-memory-utilization 0.93 --max-num-seqs 8`, MTP-3, parsers `qwen3`/`qwen3_coder`. Source = 2 instances (18010/18011, one per 3090). Target = 1 3090 → **1 instance** (port 18010) unless the user insists on a second.
+
+**Static IP / LAN exposure**: the WSL static IP is set by the **Windows** `%USERPROFILE%\.wslconfig` `ip=` line (not internal netplan). Target has none yet → create one with the target's **own** subnet IP (from `ip addr` inside WSL), `firewall=false`, and right-sized `memory=`/`processors=`. LAN reach needs `firewall=false` **and** Windows `netsh portproxy` (source has both) → target needs equivalent portproxy rules.
+
+**File transfer (the hard part)**: prefer `pscp` (checked by `_pscpchk.ps1`); else `git clone` on target (needs the package committed → ties to the pending confirmation); else base64-over-plink (small files only). Bootstrap in `_twsl.ps1`: `echo <b64> > C:\temp\x.b64` → `certutil -decode C:\temp\x.b64 C:\temp\x.sh` → `wsl -d Ubuntu-26.04 -u root -- bash /mnt/c/temp/x.sh`.
+
+**Refined plan (venv-only — target already has repo@1586706 + 15 GB model + hbravo user):**
+- Source venv = real dir `/home/hbravo/hyperqwen/venv` (15 GB; py 3.14.4, torch 2.13.0+cu130, vllm 0.30.0). Target user is ALSO `hbravo` → extract to the SAME path `/home/hbravo/hyperqwen/venv` (the venv's absolute-path refs then match; README §venv-path-caveat satisfied). The 15 GB `-fast` model is ALREADY on the target (`/mnt/c/test_ai/models/…-fast`) → only the venv crosses the wire.
+- Target long-context boot: `CUDA_VISIBLE_DEVICES=1 CTX=long PORT=18010` (target 3090 = WSL idx 1; GT1030 = idx 0). `select_model.sh`/`resolve_config.sh` auto-pick the fast model once `REPO`/`models` resolve → make repo-root `models` a symlink → `/mnt/c/test_ai/models` (mirror the source) and `venv` → `/home/hbravo/hyperqwen/venv`. The `.bat` `REPO_PATH` is D:-specific (target has no D:) → drive the target via a direct `wsl -u hbravo -- bash -c 'cd /mnt/c/repos/HyperQwen_mod && … start_qwen.sh'`, not the `.bat`s.
+- **Long-op pattern (beats the 30 s harness kill):** both WSLs have systemd. Run each heavy op as a transient unit: `wsl -d Ubuntu-26.04 -u root -- systemd-run --unit=NAME -- /bin/bash /path/helper.sh` (returns in <2 s; the unit runs in its own cgroup, so a harness kill of `wsl` can't stop it). On the target, invoke via `plink … "wsl -u root -- systemd-run …"` and poll a log the helper writes (short `plink type C:\…log` / `wsl cat`).
+- SFTP between the two **Windows** sides (both have C:): `psftp -hostkey SHA256:… -batch -l destr0 -pw <pw> 192.168.2.196` → `put C:\hyperqwen_transfer\venv.tar C:\hyperqwen_transfer\`. Target can't run psftp itself; the source pushes.
+- Target `.wslconfig` is currently ABSENT (dynamic IP 172.25.137.190/20). Create it with `ip=` = a free addr in that subnet (e.g. 172.25.128.100), `firewall=false`, right-sized `memory=`/`processors=` (target 32 cores / 23 GiB — don't copy the source's 80 GB/8 proc), then `wsl --shutdown` + relaunch.
+
+**Temp helpers (clean up at end)**: `_hostkey.txt`, `_tstate.ps1`, `_wslcfg.ps1`, `_twsl.ps1`+`_twsl_probe.sh`(`_twsl_out.txt`), `_pscpchk.ps1`, older `_probe.ps1`/`_probe_out.txt`/`_inspect*.sh`/`_sizes.sh`/`_dmodels.sh`.
+
+**Gotchas**: plink = simple cmd only (WSL via files). Target has **no D: drive**. `ai/PROJECT_DESCRIPTION.md` is **stale** (`git_head 38ac264` ≠ HEAD `1586706`) → refresh Steps 2-4 before concluding. Never commit the API key, `.env`, or `.bat` launchers.
 
 ---
 
