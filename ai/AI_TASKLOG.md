@@ -4,10 +4,85 @@
 
 | Created | Task | Status | Type | Subtasks | Time Spent | Blockers |
 |---------|------|--------|------|----------|------------|----------|
+| 23-10-2026 15:23:00 | [T4: Single-GPU Linux/bash launcher set (fast/long × cuda 0/1/2)](#task-t4-single-gpu-linux-bash-launcher-set-fastlong--cuda-012) | <span style="background-color:#0969da;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">in_progress</span> | <span style="background-color:#22863a;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">feat</span> | 7/12 | 1h 34m | none |
 | 11-10-2026 23:36:00 | [T3: Provision second node (192.168.2.196) with wsl_migrate + long-context vLLM](#task-t3-provision-second-node-1921682196-with-wsl_migrate--long-context-vllm) | <span style="background-color:#0969da;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">in_progress</span> | <span style="background-color:#22863a;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">feat</span> | 1/10 | 12m | none |
 | 08-10-2026 02:25:40 | [T1: Migrate HyperQwen Windows launchers to fork + re-apply FlashInfer cu13 link shim](#task-t1-migrate-hyperqwen-windows-launchers-to-fork--re-apply-flashinfer-cu13-link-shim) | <span style="background-color:#0969da;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">in_progress</span> | <span style="background-color:#9e6a03;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">fix</span> | 9/10 | 28m | none |
 
 > **1 completed task(s)** — [View completed tasks](#completed-tasks)
+
+---
+
+## Task T4: Single-GPU Linux/bash launcher set (fast/long × cuda 0/1/2)
+
+- **Status**: <span style="background-color:#0969da;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">in_progress</span>
+- **Type**: <span style="background-color:#22863a;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">feat</span>
+- **Created**: 23-10-2026 15:23:00
+- **Last Updated**: 23-10-2026 16:57:35
+- **Time Spent**: 1h 34m
+- **Branch**: [`feat/ai-single-gpu-bash-launchers`](https://github.com/HectorBravo/HyperQwen_mod/tree/feat/ai-single-gpu-bash-launchers) — to be rebuilt on top of the fork's `main` (`493818e`); the 7 scripts will be restored from commit `b87c01e`
+- **Commit(s)**: pending
+- **Blockers**: none (3 user confirmations pending; none block the push)
+- **Findings & Notes**:
+  - Bash twins of the 7 `.bat` launchers already committed on `main`: master `start-single.sh` + 6 wrappers `start_single-{fast,long}-cuda{0,1,2}.sh`. Same scheme: PORT = 18000 + 10×is_long + gpu_idx (fast → 18000/18001/18002; long → 18010/18011/18012), per-run CTX/SPEC override; the `.bat` passes `type gpu` to `start-single.bat`, the `.sh` hardcodes it in the wrapper.
+  - All 7: LF, no BOM, `bash -n` clean (WSL Ubuntu-26.04); misuse (bad CTX / bad GPU / no args) prints usage and exits before the real launcher runs.
+  - **No key material in any committed file**: the key resolves at runtime via the existing chain (`.env` → env → gitignored `api_key.txt`). The 48-char key exists only in the user-local untracked `vllm_api_key.env.bak`; the shared 35-char key stays in `api_key.txt`. The fork's `main` does **not** track `.env` (only `.env.example`), so nothing secret rides this branch.
+  - The clone was re-pointed this session: origin → `git@github.com:HectorBravo/HyperQwen_mod.git` (SSH), local `main` reset onto the fork's `main` (`493818e`). The old upstream-lineage main (`e5270a2`, 2 log-only commits) is preserved at `backup/pre-repoint-main`; the old feature branch (`b87c01e`) at `backup/old-single-gpu-branch`.
+  - Pre-existing quirk (left untouched): the Summary lists T1 (in_progress, 9/10) but the file body has no `## Task T1` section (it only holds T3 → Completed(T2) → T2). Not fixed here — flagged for the owner.
+  - File mechanics: pure LF, zero CRs (`.gitattributes` forces `* text=auto eol=lf`); `Measure-Object -Line` reports 190 for this file, which is the *non-blank* count (66 blanks) — the file has 255 LF lines.
+
+### User Confirmations
+
+**Pending (awaiting user response):**
+
+- [ ] (23-10-2026 16:57:35) Review/merge `feat/ai-single-gpu-bash-launchers` into `main`, or leave it open for review? After merging: final log on `main` (status `done` + merge hash + final Time Spent), then fast-forward the branch (`--ff-only`) and re-push with `--force-with-lease` (if you squash/rebase-merge: skip the sync — the branch keeps the code, nothing is lost).
+- [ ] (23-10-2026 16:57:35) For the launcher flow, is the venv inside the distro or on the Windows side (per node)? (Feeds T3's second-node provisioning as well.)
+- [ ] (23-10-2026 16:57:35) Should the same bash launchers also be built for the second node (192.168.2.196) — coordinate with T3?
+
+**Confirmed (user provided):**
+
+- (23-10-2026 16:57:35) Where this work should be pushed → "the clone URL should have been `git@github.com:HectorBravo/HyperQwen_mod.git`, a direct fork of the upstream" → origin re-pointed (SSH); all pushes target the fork; none of them expose API-key material.
+
+### Subtasks / Plan
+
+- [x] Audit the repo / launchers / `.env` (upstream clone); map the `.bat` scheme (PORT = 18000 + 10×is_long + gpu_idx; per-run CTX/SPEC override)
+- [x] Author the master `start-single.sh` (sources `.env`; per-run CTX/SPEC/PORT override; CUDA pinning; 0.0.0.0 bind; hard-fails without a key or on LAN bind)
+- [x] Author the 6 wrappers `start_single-{fast,long}-cuda{0,1,2}.sh` (fast → 18000/18001/18002; long → 18010/18011/18012; bad args → usage, never launch the real thing)
+- [x] Normalize line endings (LF, no BOM — CRLF was breaking `bash -n`); all 7 pass `bash -n` in WSL Ubuntu-26.04
+- [x] Move `VLLM_API_KEY` out of the local `.env` → untracked `vllm_api_key.env.bak` (pointer comment left in `.env`); the shared key stays in gitignored `api_key.txt`; no key material in any file to be committed
+- [x] Re-point the clone origin to the fork (SSH) and reset local `main` onto the fork's `main` (`493818e`), with backup refs
+- [x] Merge the T4 entry into the fork's `ai/AI_TASKLOG.md` (this commit)
+- [ ] Push the pre-push log to the fork's `main`
+- [ ] Rebuild `feat/ai-single-gpu-bash-launchers` on top of the fork's `main` (restore the 7 scripts from `b87c01e` with the exec bits) and push
+- [ ] Post-push log update on `main` (commit hash, time)
+- [ ] After user merge: final log on `main` (status `done`, merge hash, final Time Spent)
+- [ ] Fast-forward the branch onto the final log (`--ff-only`) + re-push with `--force-with-lease` (skip on squash/rebase merge)
+
+### Full Context Notes for AI Agents
+
+> **Purpose**: Self-contained knowledge base for resuming this task.
+
+**Topology at this commit:**
+- Repo `D:\Repos\hyperqwen`, origin = `git@github.com:HectorBravo/HyperQwen_mod.git` (SSH, re-pointed this session). Second clone of the same fork: `D:\Repos\hyperqwen_mod` (user-maintained; its `ai/AI_TASKLOG.md` == committed).
+- `main` = `origin/main` = `493818e` ("update tasklog"; chain `01761f2` add bench_single.bat ← `cf21afe` update start_single.bat ← … ← `851489d` ← common base `ce9615c` with the upstream lineage).
+- `backup/pre-repoint-main` = `e5270a2` (old upstream-lineage main; 2 log-only commits over `ce9615c`: `cf5a619`, `e5270a2`). `backup/old-single-gpu-branch` = `b87c01e` (the 7 `.sh` launchers, all mode 100755; the `feat/ai-single-gpu-bash-launchers` branch still points there too).
+- Untracked + gitignored in the worktree: `api_key.txt` (shared 35-char key), `vllm_api_key.env.bak` (48-char key — the **only** copy in the user's area), `.env` (pointer comment only), `ai/.hq-poll2.sh`, plus `wsl_migrate/` (mod clone). **None of these may ever be committed.**
+
+**The 7 scripts (canonical = blobs in `b87c01e`; LF, no BOM, 100755, no key material):**
+- `start-single.sh` — master: sources the repo `.env`; accepts per-run `CTX`/`SPEC`/`PORT` overrides; pins one GPU; binds 0.0.0.0; hard-fails if `VLLM_API_KEY` resolves empty (chain: `.env` → env → `api_key.txt` via `resolve_api_key.sh`); then `vllm serve` with the CTX/SPEC-derived model + context + port (long: fp8 KV, 0.93 gpu-mem-util, max-num-seqs 8, etc. — exact flags = the `b87c01e` blob).
+- `start_single-{fast,long}-cuda{0,1,2}.sh` — thin wrappers calling the master with the baked-in CTX/SPEC/GPU (PORT = 18000 + 10×is_long + gpu_idx).
+
+**Remaining steps (in order):**
+1. Commit this log edit on `main`: `docs(ai): [ai] add T4 (single-GPU bash launchers) to task log` → `git push origin main`. Identity: `GIT_AUTHOR_NAME=AI_bot` + `GIT_COMMITTER_NAME=AI_bot` env vars only (never set the email — the user's `git config user.email` applies); `[ai]` tag after the colon in every AI commit.
+2. `git checkout -B feat/ai-single-gpu-bash-launchers main` (fresh, on top of the fork's main + log commit) → `git checkout b87c01e -- start-single.sh start_single-fast-cuda0.sh start_single-fast-cuda1.sh start_single-fast-cuda2.sh start_single-long-cuda0.sh start_single-long-cuda1.sh start_single-long-cuda2.sh` (restores content + 100755) → re-verify (`bash -n` ×7; non-leaking key scan `git grep -c -E 'sk-[A-Za-z0-9]{20,}|VLLM_API_KEY=.?[A-Za-z0-9]{30,}' <new-tip> -- '*.sh'` must print nothing; `ls-tree` shows 100755) → commit `feat(launchers): [ai] add single-GPU Linux/bash launchers (fast/long × cuda 0/1/2)` → `git push origin feat/ai-single-gpu-bash-launchers`.
+3. Post-push: on `main`, update this log (tick subtasks 8–10, real hashes, Time Spent = now − 15:23:00) → dedicated `docs(ai):` commit → push.
+4. **Only after the user merges the branch**: final log on `main` (status `done`, merge hash, final Time Spent) → then `git checkout feat/ai-single-gpu-bash-launchers; git merge --ff-only origin/main; git push --force-with-lease origin feat/ai-single-gpu-bash-launchers`. If the merge was **squash/rebased**, the ff is impossible — leave the branch as-is and tell the user (nothing is lost; their branch has the final log).
+
+**Env / gotchas:**
+- Windows PowerShell 5.1, no admin. Native-command stderr can surface as `RemoteException` and abort a `;` chain (especially with `2>$null`); run destructive commands one at a time. No `&&` in PS 5.1 — use `;`.
+- `Get-Content | Measure-Object -Line` undercounts this file (190 ≠ 255) because blank lines count as 0 lines — use raw byte/line counts when reasoning about offsets.
+- The log is pure LF (`.gitattributes`: `* text=auto eol=lf`); keep all edits LF.
+- `editor`/`read_files` line numbers match here (the file has no CRs).
+- T3 (second-node provisioning) is a separate in_progress task — don't touch its rows/section.
 
 ---
 
