@@ -14,13 +14,24 @@ audio request function skips SSE comments like the other two. Checked against a 
 that sends a keep-alive before three tokens: stock fails with the error above, patched returns the
 text. Upstream main has the same code.
 
---- exported from cpuchip/vllm 757723b (bench-sse-keepalive); regenerate with scripts/export-patch.sh, do not edit ---
+Kind: fix
+What: `vllm bench serve` no longer fails a request whose server sends an SSE keep-alive before the
+  first token: the request functions stripped each network chunk, which deleted the blank line
+  between SSE messages and glued the `: keep-alive` comment to every message after it. With the
+  launchers' `--sse-keep-alive-interval 30`, that failed every prompt whose prefill took over 30 s
+  (`run_benchmarks.sh --long` read zeros; #216 lost its 48k+ rows). The audio request function also
+  skips SSE comments now
+Upstream: none yet
+Cut-against: 0.31.0
+Retires-when: upstream PR
+
+--- exported from 704a6bedb (bench-sse-keepalive); regenerate with scripts/export-patch.sh, do not edit ---
 
 diff --git a/benchmarks/lib/endpoint_request_func.py b/benchmarks/lib/endpoint_request_func.py
-index 54c6ce6..a12cbf6 100644
+index 14ff6c1ab..e7c3083bf 100644
 --- a/benchmarks/lib/endpoint_request_func.py
 +++ b/benchmarks/lib/endpoint_request_func.py
-@@ -207,8 +207,9 @@
+@@ -209,8 +209,9 @@
                  handler = StreamedResponseHandler()
  
                  async for chunk_bytes in response.content.iter_any():
@@ -32,7 +43,7 @@ index 54c6ce6..a12cbf6 100644
                          continue
  
                      messages = handler.add_chunk(chunk_bytes)
-@@ -384,8 +385,9 @@
+@@ -386,8 +387,9 @@
                  first_chunk_received = False
                  handler = StreamedResponseHandler()
                  async for chunk_bytes in response.content.iter_any():
@@ -44,7 +55,7 @@ index 54c6ce6..a12cbf6 100644
                          continue
  
                      message_strings = handler.add_chunk(chunk_bytes)
-@@ -513,14 +515,19 @@
+@@ -687,14 +689,19 @@
                      handler = StreamedResponseHandler()
  
                      async for chunk_bytes in response.content.iter_any():

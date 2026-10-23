@@ -15,6 +15,11 @@ manual venv path is for hacking on the stack, or running it bare-metal.
 > with a full RTX 3090 reproduction of the benchmark tables in
 > [docs/reproductions/native-3090.md](reproductions/native-3090.md).
 
+Volta (V100, sm70) and older cards cannot run this stack at all: the CUDA 13.0 build of torch 2.13
+that vLLM 0.31 pins carries kernels for sm_75 and newer only (`torch.cuda.get_arch_list()`), CUDA 13
+dropped Volta, and vLLM's Marlin W4A16 kernel needs compute capability 7.5 or newer
+([#349](https://github.com/syv-ai/HyperQwen/issues/349)). Turing (sm75) is untested.
+
 You need: a 24 GB Ampere or newer NVIDIA card, a recent driver, Python 3.12,
 ~40 GB disk — and if the host has less than ~16 GB of free RAM, load the
 weights with the streamer instead of the stock loader (gotcha 45: the stock
@@ -26,8 +31,8 @@ git clone https://github.com/syv-ai/HyperQwen ~/qwen-serving
 cd ~/qwen-serving
 
 python3 -m venv venv
-venv/bin/pip install vllm==0.30.0 huggingface_hub hf_transfer ninja \
-  --extra-index-url https://flashinfer.ai/whl/ flashinfer-cubin==0.6.18.post1 pandas \
+venv/bin/pip install vllm==0.31.0 huggingface_hub hf_transfer ninja \
+  --extra-index-url https://flashinfer.ai/whl/ flashinfer-cubin==0.7.0.post1 pandas \
   nvidia-cuda-nvcc==13.0.88 nvidia-cuda-crt==13.0.88 nvidia-cuda-cccl==13.0.85 nvidia-nvvm==13.0.88
 # The four nvidia-* pins hold the CUDA 13 compiler at the runtime's 13.0 (see "Any
 # FlashInfer JIT needs nvcc ... to EQUAL" below): unpinned, pip now resolves nvcc 13.4
@@ -36,7 +41,8 @@ venv/bin/pip install vllm==0.30.0 huggingface_hub hf_transfer ninja \
 # bench/prefill_ab.sh's decode guard dies with "Please install vllm[bench] for
 # bench support" after the prefill rows have already run.
 # flashinfer-python is NOT listed above on purpose: the vllm wheel pins it exactly
-# (Requires-Dist: flashinfer-python==0.6.18.post1 on 0.30.0, ==0.6.18 on 0.29.0), so
+# (Requires-Dist: flashinfer-python==0.7.0.post1 on 0.31.0, ==0.6.18.post1 on 0.30.0,
+# ==0.6.18 on 0.29.0), so
 # naming it here can only fight that pin. Do not downgrade it to fix a cubin version
 # mismatch: that drags torch back and breaks vLLM's C extension.
 #
@@ -53,9 +59,18 @@ venv/bin/pip install vllm==0.30.0 huggingface_hub hf_transfer ninja \
 # it because a venv host may have no usable nvcc.
 #
 # It does NOT cover everything. No cubin release carries the vocab-wide top-k, so
-# the DFlash2 candidate selector still JITs on first use, and that JIT needs a
-# working nvcc (see below). SPEC=dflash2 is the only line that reaches it, which is
-# why SPEC=off and SPEC=mtp boot on a box where dflash2 does not.
+# with VLLM_USE_FLASHINFER_SAMPLER=1 the DFlash2 candidate selector JITs on first
+# use, and that JIT needs a working nvcc (see below). All three launchers export it
+# as 0, so no shipped launcher reaches the sampler or selector JIT: a native
+# SPEC=dflash2 boot of 0.31.0 from this file built no FlashInfer kernels.
+#
+# The fp8-KV attention kernel is the JIT the shipped launchers do reach. No cubin
+# release carries FlashInfer's fp8-KV batch_prefill either, so the profiles that run
+# FlashInfer attention on an fp8 KV cache (batch, whose KV=fp8 is the default, and
+# single-user CTX=long unless PTH_FA=1 takes it, its default on an 8.6 GPU with pthfa/ installed) build it once per cold cache, ~31-36 s inside the first
+# CUDA-graph capture, on 0.30.0 and 0.31.0 alike. The launchers point CUDA_HOME at
+# the venv's nvcc 13.0.88 (the pins above) when the system nvcc is older, and that
+# is the nvcc that builds it.
 #
 # If you have no usable nvcc, set VLLM_USE_FLASHINFER_SAMPLER=0 (the launchers
 # already do): it now covers the selector as well as the sampler and falls back to
@@ -69,8 +84,9 @@ venv/bin/pip install vllm==0.30.0 huggingface_hub hf_transfer ninja \
 # nvcc older than 13.0 rejects outright ("nvcc fatal : Unknown option"); 0.6.16.post3
 # does not emit it, which is why the 0.28 line is unaffected.
 #
-# On the venv path you also want the CUDA curand *headers*. vLLM's DFlash2
-# sampling path JIT-compiles a FlashInfer kernel that includes curand.h; without
+# If you set VLLM_USE_FLASHINFER_SAMPLER=1, the venv path also wants the CUDA
+# curand *headers*. vLLM's DFlash2 sampling path then JIT-compiles a FlashInfer
+# kernel that includes curand.h; without
 # the headers the build fails with "fatal error: curand.h: No such file or
 # directory" and it *silently falls back* -- you get correct output at a lower
 # rate, not an error. A 4x 5060 Ti reporter measured 192.9 -> 202.1 tok/s
@@ -102,7 +118,7 @@ venv/bin/python prepare/fetch_dflash2.py
 venv/bin/python prepare/fetch_thirdparty.py
 venv/bin/python prepare/quant_heads_stream.py models/Qwen3.8-27B-Uncensored-W4A16
 
-# patch vllm (all compatible patches are written against 0.30.0; reapply after upgrades).
+# patch vllm (all compatible patches are written against 0.31.0; reapply after upgrades).
 # patches/apply.sh applies patches/series in order, with --fuzz 0, and stops at the first
 # patch that does not apply, by name. The order matters: a few patches carry hunk context
 # that an earlier patch adds. A new independent patch goes on the last line of
@@ -114,6 +130,15 @@ SP=$(venv/bin/python -c 'import vllm, os; print(os.path.dirname(vllm.__file__))'
 bash patches/apply.sh "$SP"
 # optional: the KVarN 4/2-bit KV cache for 262k context (docs/long-context.md)
 bash kvarn/install.sh
+# optional: the fp8-KV FlashAttention-2 build for FA2_FP8KV=1 (fa2/README.md). It compiles two CUDA
+# libraries with nvcc 13 (the pip nvcc above is found automatically), needs git and a host C++
+# compiler, and takes ~3-5 minutes. Nothing uses it unless FA2_FP8KV=1.
+bash fa2/install.sh
+# optional: the pth-flash-attn int8-KV attention backend (pthfa/README.md). Once installed it is the default
+# for SPEC=mtp CTX=long and SPEC=dflash2 CTX=long on a compute capability 8.6 GPU (PTH_FA=0 opts out; without
+# the install those arms keep their own default and the launcher says so once). It compiles one CUDA library
+# for sm80/86/89 with nvcc 13 and a host C++ compiler; no GPU and no network. Nothing else uses it.
+bash pthfa/install.sh
 
 # api key — optional on one machine: with no key the launchers bind 127.0.0.1 only. To serve other
 # machines, set a key (they then bind 0.0.0.0) or set HOST explicitly.

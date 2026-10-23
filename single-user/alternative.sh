@@ -9,6 +9,15 @@
 # Needs patches/int4-kv-per-token-head.patch (applied by setup like the
 # rest of patches/). Profile contributed in PR #42 (@lachhabw).
 set -e
+# KV_OFFLOAD_GB=N has to become --kv-offloading-size before the allocator default below reads EXTRA_ARGS.
+# shellcheck disable=SC1091
+source "$(dirname "$(cd "$(dirname "$0")" && pwd)")/launcher_common.sh" \
+  || { echo "[alternative] cannot source launcher_common.sh - refusing to boot" >&2; exit 1; }
+qwen_normalize_extra_args
+qwen_check_bool_knobs
+qwen_fa2_fp8kv_single_only alternative.sh
+qwen_kv_offload_args
+qwen_prefix_cache
 
 if grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null || [ -n "${WSL_DISTRO_NAME:-}" ]; then
   ALLOC_DEFAULT=expandable_segments:False
@@ -66,6 +75,7 @@ if [ "${VLLM_OFFLOAD_KEEP_SHM:-0}" != 1 ]; then
     grep -lqs "$f" /proc/[0-9]*/maps 2>/dev/null || { echo "[alternative] removing stale offload region $f"; rm -f "$f"; }
   done
 fi
+qwen_kv_offload_shm_check
 
 MODEL=${MODEL:-models/Qwen3.8-27B-W4A16-AutoRound}
 DRAFT=${DRAFT:-models/Qwen3.8-27B-DFlash2-W4A16}
@@ -93,20 +103,16 @@ MAX_SEQS=${MAX_SEQS:-1}
 CG=$(( MAX_SEQS * (DRAFT_TOKENS + 1) > 64 ? 64 : MAX_SEQS * (DRAFT_TOKENS + 1) ))
 # DFLASH_TOKENS>7 needs the synchronous scheduler, same as start_qwen.sh.
 if [ "$DRAFT_TOKENS" -gt 7 ]; then ASYNC_SCHED=${ASYNC_SCHED:-0}; else ASYNC_SCHED=${ASYNC_SCHED:-1}; fi
-PREFIX_CACHE=${PREFIX_CACHE:-1}
 
-VISION_ARGS="--language-model-only"
-[ "$VISION" = 1 ] && VISION_ARGS='--mm-processor-kwargs {"size":{"shortest_edge":65536,"longest_edge":2097152}}'
+qwen_vision_args
 
-PREFIX_ARGS=""
-[ "$PREFIX_CACHE" = 1 ] && PREFIX_ARGS="--enable-prefix-caching --mamba-cache-mode align"
 # With the drafter on, pass the retention interval explicitly: 0.30's unset default is 0 (the replay
 # boundaries only), where 0.29 resolved it to dense (vllm #55760); start_qwen.sh has the measurement.
 # The default here depends on a KV tier (the connector check above): without one it is 0, because at dense two
 # ~60K conversations on this int4 pool evicted each other completely (0 / 0 cached where 0 held 93.5% for both);
 # with one it is None (dense), which the tier serves from (gotcha 60). PREFIX_RETENTION sets it (0 = boundaries
 # only, empty = dense); the flag in EXTRA_ARGS wins.
-if [ "$PREFIX_CACHE" = 1 ] && [ "$SPEC" = dflash2 ]; then
+if [ "$PREFIX_CACHE_ON" = 1 ] && [ "$SPEC" = dflash2 ]; then
   case " ${EXTRA_ARGS:-} " in
     *"--prefix-cache-retention-interval"*) ;;
     *)
@@ -115,7 +121,7 @@ if [ "$PREFIX_CACHE" = 1 ] && [ "$SPEC" = dflash2 ]; then
         *) R_DEFAULT=0 ;;
       esac
       if [ "${PREFIX_RETENTION+set}" = set ]; then R=${PREFIX_RETENTION:-None}; else R=$R_DEFAULT; fi
-      PREFIX_ARGS="$PREFIX_ARGS --prefix-cache-retention-interval $R" ;;
+      EXTRA_ARGS="--prefix-cache-retention-interval $R ${EXTRA_ARGS:-}" ;;
   esac
 fi
 
@@ -147,7 +153,7 @@ qwen_exec vllm serve "$MODEL" \
   --max-model-len $MAX_LEN \
   --max-num-seqs $MAX_SEQS \
   --api-server-count 1 \
-  ${VISION_ARGS} \
+  "${VISION_ARGS[@]}" \
   ${ATTN_ARGS} \
   --mamba-ssm-cache-dtype float16 \
   "${ASYNC_ARGS[@]}" \
@@ -158,6 +164,6 @@ qwen_exec vllm serve "$MODEL" \
   --enable-prompt-tokens-details \
   "${METRICS_ARGS[@]}" \
   --enable-auto-tool-choice --tool-call-parser qwen3_coder \
+  --tool-strict-level "${TOOL_STRICT:-parameter}" \
   --default-chat-template-kwargs "{\"enable_thinking\": $ENABLE_THINKING}" \
-  ${PREFIX_ARGS} \
   ${EXTRA_ARGS}
