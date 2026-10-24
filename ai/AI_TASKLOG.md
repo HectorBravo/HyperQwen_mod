@@ -4,24 +4,23 @@
 
 | Created | Task | Status | Type | Subtasks | Time Spent | Blockers |
 |---------|------|--------|------|----------|------------|----------|
-| 23-10-2026 15:23:00 | [T4: Single-GPU Linux/bash launcher set (fast/long × cuda 0/1/2)](#task-t4-single-gpu-linux-bash-launcher-set-fastlong--cuda-012) | <span style="background-color:#0969da;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">in_progress</span> | <span style="background-color:#22863a;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">feat</span> | 9/12 | 1h 46m | none |
 | 11-10-2026 23:36:00 | [T3: Provision second node (192.168.2.196) with wsl_migrate + long-context vLLM](#task-t3-provision-second-node-1921682196-with-wsl_migrate--long-context-vllm) | <span style="background-color:#0969da;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">in_progress</span> | <span style="background-color:#22863a;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">feat</span> | 1/10 | 12m | none |
 | 08-10-2026 02:25:40 | [T1: Migrate HyperQwen Windows launchers to fork + re-apply FlashInfer cu13 link shim](#task-t1-migrate-hyperqwen-windows-launchers-to-fork--re-apply-flashinfer-cu13-link-shim) | <span style="background-color:#0969da;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">in_progress</span> | <span style="background-color:#9e6a03;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">fix</span> | 9/10 | 28m | none |
 
-> **1 completed task(s)** — [View completed tasks](#completed-tasks)
+> **2 completed task(s)** — [View completed tasks](#completed-tasks)
 
 ---
 
 ## Task T4: Single-GPU Linux/bash launcher set (fast/long × cuda 0/1/2)
 
-- **Status**: <span style="background-color:#0969da;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">in_progress</span>
+- **Status**: <span style="background-color:#22863a;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">done</span>
 - **Type**: <span style="background-color:#22863a;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">feat</span>
 - **Created**: 23-10-2026 15:23:00
-- **Last Updated**: 23-10-2026 17:08:20
-- **Time Spent**: 1h 46m
-- **Branch**: [`feat/ai-single-gpu-bash-launchers`](https://github.com/HectorBravo/HyperQwen_mod/tree/feat/ai-single-gpu-bash-launchers) (tip [`17f5f9d`](https://github.com/HectorBravo/HyperQwen_mod/commit/17f5f9d) — 7 scripts, mode 100755, LF, no key material)
-- **Commit(s)**: [`2503a60`](https://github.com/HectorBravo/HyperQwen_mod/commit/2503a60) (pre-push log on `main`), [`17f5f9d`](https://github.com/HectorBravo/HyperQwen_mod/commit/17f5f9d) (branch); final merge hash pending
-- **Blockers**: none (3 user confirmations pending; none block the push)
+- **Last Updated**: 24-10-2026 23:07:06
+- **Time Spent**: 1h 50m
+- **Branch**: [`feat/ai-single-gpu-bash-launchers`](https://github.com/HectorBravo/HyperQwen_mod/tree/feat/ai-single-gpu-bash-launchers) — merged into `main` (normal merge [`bcdeada`](https://github.com/HectorBravo/HyperQwen_mod/commit/bcdeada)); branch fast-forwarded onto the final log and re-pushed
+- **Commit(s)**: [`2503a60`](https://github.com/HectorBravo/HyperQwen_mod/commit/2503a60) (pre-push log on `main`), [`17f5f9d`](https://github.com/HectorBravo/HyperQwen_mod/commit/17f5f9d) (launchers, branch), [`bcdeada`](https://github.com/HectorBravo/HyperQwen_mod/commit/bcdeada) (merge into `main`); this commit = final log (no self-hash, same as T2)
+- **Blockers**: none (2 user confirmations pending; both non-blocking)
 - **Findings & Notes**:
   - Bash twins of the 7 `.bat` launchers already committed on `main`: master `start-single.sh` + 6 wrappers `start_single-{fast,long}-cuda{0,1,2}.sh`. Same scheme: PORT = 18000 + 10×is_long + gpu_idx (fast → 18000/18001/18002; long → 18010/18011/18012), per-run CTX/SPEC override; the `.bat` passes `type gpu` to `start-single.bat`, the `.sh` hardcodes it in the wrapper.
   - All 7: LF, no BOM, `bash -n` clean (WSL Ubuntu-26.04); misuse (bad CTX / bad GPU / no args) prints usage and exits before the real launcher runs.
@@ -34,12 +33,12 @@
 
 **Pending (awaiting user response):**
 
-- [ ] (23-10-2026 16:57:35) Review/merge `feat/ai-single-gpu-bash-launchers` into `main`, or leave it open for review? After merging: final log on `main` (status `done` + merge hash + final Time Spent), then fast-forward the branch (`--ff-only`) and re-push with `--force-with-lease` (if you squash/rebase-merge: skip the sync — the branch keeps the code, nothing is lost).
 - [ ] (23-10-2026 16:57:35) For the launcher flow, is the venv inside the distro or on the Windows side (per node)? (Feeds T3's second-node provisioning as well.)
 - [ ] (23-10-2026 16:57:35) Should the same bash launchers also be built for the second node (192.168.2.196) — coordinate with T3?
 
 **Confirmed (user provided):**
 
+- (24-10-2026 23:07:06) Review/merge `feat/ai-single-gpu-bash-launchers` into `main`? → "I've merged the task, edit now the final log" → merged as normal merge `bcdeada`; final log = this commit; branch fast-forwarded onto it and re-pushed (`--force-with-lease`).
 - (23-10-2026 16:57:35) Where this work should be pushed → "the clone URL should have been `git@github.com:HectorBravo/HyperQwen_mod.git`, a direct fork of the upstream" → origin re-pointed (SSH); all pushes target the fork; none of them expose API-key material.
 
 ### Subtasks / Plan
@@ -54,8 +53,8 @@
 - [x] Push the pre-push log to the fork's `main` (`2503a60`)
 - [x] Rebuild `feat/ai-single-gpu-bash-launchers` on top of the fork's `main` (7 scripts restored from `b87c01e`, LF + 100755 + `bash -n` ×7 re-verified, key scan clean) and push → `17f5f9d`
 - [ ] Post-push log update on `main` (this commit)
-- [ ] After user merge: final log on `main` (status `done`, merge hash, final Time Spent)
-- [ ] Fast-forward the branch onto the final log (`--ff-only`) + re-push with `--force-with-lease` (skip on squash/rebase merge)
+- [x] After user merge: final log on `main` (status `done`, merge hash `bcdeada`, final Time Spent 1h 50m) — this commit
+- [x] Fast-forward the branch onto the final log (`--ff-only`) + re-push with `--force-with-lease` (normal merge, so the ff applies — squash/rebase exception not needed)
 
 ### Full Context Notes for AI Agents
 
@@ -76,6 +75,8 @@
 2. `git checkout -B feat/ai-single-gpu-bash-launchers main` (fresh, on top of the fork's main + log commit) → `git checkout b87c01e -- start-single.sh start_single-fast-cuda0.sh start_single-fast-cuda1.sh start_single-fast-cuda2.sh start_single-long-cuda0.sh start_single-long-cuda1.sh start_single-long-cuda2.sh` (restores content + 100755) → re-verify (`bash -n` ×7; non-leaking key scan `git grep -c -E 'sk-[A-Za-z0-9]{20,}|VLLM_API_KEY=.?[A-Za-z0-9]{30,}' <new-tip> -- '*.sh'` must print nothing; `ls-tree` shows 100755) → commit `feat(launchers): [ai] add single-GPU Linux/bash launchers (fast/long × cuda 0/1/2)` → `git push origin feat/ai-single-gpu-bash-launchers`.
 3. Post-push: on `main`, update this log (tick subtasks 8–10, real hashes, Time Spent = now − 15:23:00) → dedicated `docs(ai):` commit → push.
 4. **Only after the user merges the branch**: final log on `main` (status `done`, merge hash, final Time Spent) → then `git checkout feat/ai-single-gpu-bash-launchers; git merge --ff-only origin/main; git push --force-with-lease origin feat/ai-single-gpu-bash-launchers`. If the merge was **squash/rebased**, the ff is impossible — leave the branch as-is and tell the user (nothing is lost; their branch has the final log).
+
+**Final state (24-10-2026 23:07:06):** user merged the branch as a **normal merge** → merge commit `bcdeada` on `main` (parents `e1b819e` + `17f5f9d`); this commit is the final log on `main`; `feat/ai-single-gpu-bash-launchers` was fast-forwarded onto it and re-pushed with `--force-with-lease` (squash/rebase exception not needed). **Task complete.**
 
 **Env / gotchas:**
 - Windows PowerShell 5.1, no admin. Native-command stderr can surface as `RemoteException` and abort a `;` chain (especially with `2>$null`); run destructive commands one at a time. No `&&` in PS 5.1 — use `;`.
@@ -251,6 +252,7 @@
 
 | Created | Task | Type | Subtasks | Time Spent |
 |---------|------|------|----------|------------|
+| 23-10-2026 15:23:00 | [T4: Single-GPU Linux/bash launcher set (fast/long × cuda 0/1/2)](#task-t4-single-gpu-linux-bash-launcher-set-fastlong--cuda-012) | <span style="background-color:#22863a;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">feat</span> | 12/12 | 1h 50m |
 | 08-10-2026 03:14:30 | [T2: Commit .bat launchers + project indexer (api_key.txt key migration)](#task-t2-commit-bat-launchers--project-indexer-api_keytxt-key-migration) | <span style="background-color:#57606a;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;">chore</span> | 6/6 | 12m |
 
 ---
