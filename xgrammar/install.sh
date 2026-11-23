@@ -17,6 +17,11 @@ git -C "$W/src" fetch -q --tags https://github.com/mlc-ai/xgrammar
 git -C "$W/src" checkout -q "$COMMIT"
 [ "$(git -C "$W/src" rev-parse HEAD)" = "$COMMIT" ] || { echo "xgrammar: fetched $(git -C "$W/src" rev-parse HEAD), PIN says $COMMIT"; exit 1; }
 git -C "$W/src" submodule update -q --init --recursive --depth 1   # dlpack, picojson
+# Local build fix (fork): xgrammar's CMakeLists hardcodes "-Werror ... -flto=auto".
+# On gcc 13.4 (ubuntu24.04 updates) LTO reports std::variant ODR violations as
+# errors and the wheel link fails; upstream CI's older gcc does not hit it.
+# Downgrade -Werror to warnings for the local build only.
+sed -i 's/-Werror/-Wno-error/g' "$W/src/CMakeLists.txt"
 "$PY" -m pip wheel -q --no-deps -w "$W/dist" "$W/src"
 "$PY" -m pip install -q --no-deps --force-reinstall "$W"/dist/xgrammar-*.whl
 "$PY" "$HERE/check.py"
