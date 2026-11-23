@@ -85,7 +85,9 @@ bash verify.sh --no-server
 ```bash
 VLLM_API_KEY=<your key>            # required for the 0.0.0.0 bind the launchers use
 CUDA_DEVICE_ORDER=PCI_BUS_ID       # makes CUDA index == nvidia-smi index on mixed-card boxes
-CUDA_VISIBLE_DEVICES=0             # pin the container… er, the server, to the first 3090
+# Do NOT put CUDA_VISIBLE_DEVICES in .env: the native launchers source .env and would
+# inherit it, hiding the other cards (each start_single-* launcher pins its own GPU).
+# It is only needed for Docker runs — pass it inline there instead.
 # PORT=18031                       # only if 18020 is taken (Windows iphlpsvc can leak it)
 ```
 
@@ -106,7 +108,7 @@ compile + CUDA-graph capture + one-time FlashInfer JIT. Ctrl-C stops the server.
 | Symptom | Cause → Fix |
 |---|---|
 | `ld: cannot find -lcudart / -lcuda` on first `CTX=long` boot | step A above (lib64/dev-symlink shims) |
-| Server lands on the 4070 and OOMs at load | CUDA numbers fastest-first → `CUDA_DEVICE_ORDER=PCI_BUS_ID` + pin `CUDA_VISIBLE_DEVICES` |
+| Server lands on the 4070 and OOMs at load | CUDA numbers fastest-first → `CUDA_DEVICE_ORDER=PCI_BUS_ID` (in `.env` is fine — it's index-order only, not a pin); each launcher pins its own GPU via `CUDA_VISIBLE_DEVICES` |
 | Launcher dies instantly with a stale `CUDA_HOME` | don't pin `CUDA_HOME` in the `.bat`; `start_qwen.sh` auto-detects the venv's nvcc (fixed in commit `189634b`) |
 | Port 18020 bound by `svchost` (iphlpsvc) before WSL starts | Windows leak; only a host reboot clears it → use `PORT=18031` until then |
 | WSL distro vanishes mid-operation (long builds) | don't run heavy steps from an ephemeral session — nohup/setsid them, or keep any window open |
