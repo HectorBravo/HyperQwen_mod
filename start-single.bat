@@ -44,7 +44,9 @@ set REPO_PATH=/mnt/d/repos/HyperQwen_mod
 set HOST=0.0.0.0
 set PREFIX_CACHE=1
 set VLLM_WSL2_ENABLE_PIN_MEMORY=1
-set CUDA_HOME=/home/hbravo/hyperqwen/venv/lib/python3.14/site-packages/nvidia/cu13
+REM CUDA_HOME is not pinned: start_qwen.sh auto-detects the CUDA toolchain inside
+REM the venv (this pin pointed at the old 0.30 venv's cu13 dir and broke after the
+REM venv was rebuilt for 0.33; see start-single.sh for the same decision).
 set CUDA_DEVICE_ORDER=PCI_BUS_ID
 set INT8_ACT=int8
 set PREFILL_ATTN=int8
